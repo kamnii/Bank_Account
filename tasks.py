@@ -36,6 +36,24 @@ def symbol_count(text: str):
         print(f"Символы: {key}: {value}")
 
 
+from collections import defaultdict, Counter
+
+
+text = 'the red fox ran as fast as it could'
+
+def symbol_count(text: str):
+    text = text.lower()
+    symbols_dict = defaultdict(int)
+
+    for letters in text:
+        symbols_dict[letters] += 1
+
+    return symbols_dict
+
+
+# print(Counter(symbol_count(text)).most_common())
+
+
 def chat_symbol_count(text: str):
     text = text.lower()
     symbols_dictionary = {}
@@ -188,4 +206,4 @@ def chat_frequency_element(lst: list):
 
     return [k for k, v in counter.items() if max(counter.values()) == v]
 
-print(frequency_element(['kaniet', 'kaniet', 'emil', 'beka', 'suli', 'suli', 'suli', 'kaniet', 7, 7, 7]))
+# print(frequency_element(['kaniet', 'kaniet', 'emil', 'beka', 'suli', 'suli', 'suli', 'kaniet', 7, 7, 7]))
