@@ -1,15 +1,16 @@
-import csv
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+import csv
 
 
 class BankAccount:   # Комиссия, взимается за переводы между счетами.
-    exchange_rate = 87.36
+    exchange_rate = Decimal('87.36')
 
     def __init__(self, account_number):
         self.account_number = account_number
         self.is_blocked = False
-        self.balance_usd = 0.0
-        self.balance_kgs = 0.0
+        self.balance_usd = Decimal('0.00')
+        self.balance_kgs = Decimal('0.00')
         self.history_file = f'TransactionsHistory/history_{self.account_number}.csv'
 
         try:        # Создание csv файла с историями транзакций.
@@ -24,6 +25,10 @@ class BankAccount:   # Комиссия, взимается за перевод�
         with open(self.history_file, 'a', newline="", encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), operation, amount, target_account])
+
+
+    def _round_decimal(self, value: Decimal) -> Decimal:
+        return value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
     def check_history(self):         # Просмотр истории транзакций.
@@ -41,17 +46,20 @@ class BankAccount:   # Комиссия, взимается за перевод�
             return 'История операций не найдена.'
         
 
-    def set_exchange_rate(self, new_rate):
-        self.exchange_rate = new_rate
-        return f'Курс обновлен: 1 USD = {new_rate} KGS.'
+    def set_exchange_rate(self, new_rate: Decimal):
+        self.exchange_rate = Decimal(str(new_rate))
+
+        return f'Курс обновлен: 1 USD = {self._round_decimal(self.exchange_rate)} KGS.'
 
 
-    def deposit(self, amount, currency='KGS'):       # Пополнение баланса.
+    def deposit(self, amount: Decimal, currency='KGS'):       # Пополнение баланса.
         if self.is_blocked is True:
             return 'Ошибка пополнения. Ваш аккаунт заблокирован!'
         
         if amount < 0:
             return 'Ошибка! Сумма пополнения не может быть отрицательной.'
+        
+        amount = Decimal(str(amount))
 
         if currency == 'KGS':
             self.balance_kgs += amount
@@ -60,29 +68,31 @@ class BankAccount:   # Комиссия, взимается за перевод�
         else:
             return 'Счета для такой валюты нет.'
 
-        self._add_history('deposit', float(amount))
+        self._add_history('deposit', self._round_decimal(amount))
         self._add_history('currency', currency)
-        return f'На счет {self.account_number} {currency} внесена сумма: {float(amount)}. Текущий баланс: KGS - {self.balance_kgs}, USD - {self.balance_usd}.'
+        return f'На счет {self.account_number} {currency} внесена сумма: {self._round_decimal(amount)}. Текущий баланс: KGS - {self._round_decimal(self.balance_kgs)}, USD - {self._round_decimal(self.balance_usd)}.'
 
     
-    def withdraw(self, amount, currency='KGS'):        # Снятие денег с баланса.
+    def withdraw(self, amount: Decimal, currency='KGS'):        # Снятие денег с баланса.
         if self.is_blocked is True:
             return 'Ошибка снятия денег. Ваш аккаунт заблокирован!'
         
         if amount < 0:
             return 'Ошибка! Сумма снятия не может быть отрицательной.'
         
+        amount = Decimal(str(amount))
+
         if currency == 'KGS':
             if amount > 100000:
                 return 'Нельзя снять больше 100 000 KGS за одну операцию.'
 
             if self.balance_kgs >= amount:
                 self.balance_kgs -= amount
-                self._add_history('withdraw', float(amount))
+                self._add_history('withdraw', self._round_decimal(amount))
                 self._add_history('currency', currency)
-                return f'Со счета {self.account_number} KGS снята сумма: {float(amount)}. Текущий баланс: {self.balance_kgs}.'
+                return f'Со счета {self.account_number} KGS снята сумма: {self._round_decimal(amount)}. Текущий баланс: {self._round_decimal(self.balance_kgs)}.'
             else:
-                return f'Ошибка! На счету {self.account_number} - KGS недостаточно средств для снятия суммы: {self.balance_kgs}.'
+                return f'Ошибка! На счету {self.account_number} - KGS недостаточно средств для снятия суммы: {self._round_decimal(self.balance_kgs)}.'
 
         elif currency == 'USD':
             if amount > 3500:
@@ -90,90 +100,92 @@ class BankAccount:   # Комиссия, взимается за перевод�
             
             if self.balance_usd >= amount:
                 self.balance_usd -= amount
-                self._add_history('withdraw', float(amount))
+                self._add_history('withdraw', self._round_decimal(amount))
                 self._add_history('currency', currency)
-                return f'Со счета {self.account_number} - USD снята сумма: {float(amount)}. Текущий баланс: {self.balance_usd}.'
+                return f'Со счета {self.account_number} - USD снята сумма: {self._round_decimal(amount)}. Текущий баланс: {self._round_decimal(self.balance_usd)}.'
             else:
-                return f'Ошибка! На счету {self.account_number} - USD недостаточно средств для снятия суммы: {self.balance_usd}.'
+                return f'Ошибка! На счету {self.account_number} - USD недостаточно средств для снятия суммы: {self._round_decimal(self.balance_usd)}.'
             
         else:
             return 'Счетов с другой валютой нет.'
 
         
-    
     def check_balance(self):       # Проверка баланса.
         if self.is_blocked is True:
             return 'Ошибка проверки. Ваш аккаунт заблокирован!'
 
-        self._add_history('chek_balance', f'USD-{self.balance_usd}/KGS-{self.balance_kgs}')
-        return f'Текущий баланс: KGS - {round(self.balance_kgs, 3)}; USD - {round(self.balance_usd, 3)}.'
+        self._add_history('chek_balance', f'USD-{self._round_decimal(self.balance_usd)}/KGS-{self._round_decimal(self.balance_kgs)}')
+        return f'Текущий баланс: KGS - {self._round_decimal(self.balance_kgs)}; USD - {self._round_decimal(self.balance_usd)}.'
     
 
-    def transfer(self, target_account, amount, currency='KGS', target_currency='KGS'):       # Переводы между счетами, где взимается комиссия 1% за перевод.
+    def transfer(self, target_account, amount: Decimal, currency='KGS', target_currency='KGS'):       # Переводы между счетами, где взимается комиссия 1% за перевод.
         if self.is_blocked is True:
             return 'Ошибка перевода. Ваш аккаунт заблокирован!'
         
         if amount < 0:
             return 'Ошибка! Сумма перевода должна быть положительной.'
         
+        amount = Decimal(str(amount))
+
         if currency == 'KGS':
-            comission = amount / 100
+            comission = amount / Decimal('100')
             total_debit = comission + amount
             if self.balance_kgs >= total_debit:
                 self.balance_kgs -= total_debit
                 if target_currency == 'KGS':
                     target_account.balance_kgs += amount
-                    self._add_history('transfer_KGS/KGS', float(amount), target_account.account_number)
-                    self._add_history('comission', comission, target_account.account_number)
-                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} KGS. Сумма перевода: {float(amount)}. Комиссия составила: {comission}.'
+                    self._add_history('transfer_KGS/KGS', self._round_decimal(amount), target_account.account_number)
+                    self._add_history('comission', self._round_decimal(comission), target_account.account_number)
+                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} KGS. Сумма перевода: {self._round_decimal(amount)}. Комиссия составила: {self._round_decimal(comission)}.'
                 elif target_currency == 'USD':
                     target_account.balance_usd += amount / self.exchange_rate
-                    self._add_history('transfer_KGS/USD', f'KGS-{float(amount)}/USD-{amount/self.exchange_rate}', target_account.account_number)
-                    self._add_history('comission', comission, target_account.account_number)
-                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} USD. Сумма перевода: KGS {float(amount)} -> USD {float(amount/self.exchange_rate)}. Комиссия составила: {comission}.'
+                    self._add_history('transfer_KGS/USD', f'KGS-{self._round_decimal(amount)}/USD-{self._round_decimal(amount/self.exchange_rate)}', target_account.account_number)
+                    self._add_history('comission', self._round_decimal(comission), target_account.account_number)
+                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} USD. Сумма перевода: KGS {self._round_decimal(amount)} -> USD {self._round_decimal(amount/self.exchange_rate)}. Комиссия составила: {self._round_decimal(comission)}.'
                 else: 
                     return 'Счета с такой валютой нет.'
             else:
-                return f'Ошибка! Недостаточно средств на счете: {self.balance_kgs}'
+                return f'Ошибка! Недостаточно средств на счете: {self._round_decimal(self.balance_kgs)}'
             
         elif currency == 'USD':
-            comission = amount / 100
+            comission = amount / Decimal('100')
             total_debit = comission + amount
             if self.balance_usd >= total_debit:
                 self.balance_usd -= total_debit
                 if target_currency == 'KGS':
                     target_account.balance_kgs += amount * self.exchange_rate
-                    self._add_history('transfer_USD/KGS', f'USD-{float(amount)}/KGS-{amount*self.exchange_rate}', target_account.account_number)
-                    self._add_history('comission', comission, target_account.account_number)
-                    return f'Перевод: со счета {self.account_number} USD в счет {target_account.account_number} KGS. Сумма перевода: USD {float(amount)} -> KGS {float(amount*self.exchange_rate)}. Комиссия составила: {comission}.'
+                    self._add_history('transfer_USD/KGS', f'USD-{self._round_decimal(amount)}/KGS-{self._round_decimal(amount*self.exchange_rate)}', target_account.account_number)
+                    self._add_history('comission', self._round_decimal(comission), target_account.account_number)
+                    return f'Перевод: со счета {self.account_number} USD в счет {target_account.account_number} KGS. Сумма перевода: USD {self._round_decimal(amount)} -> KGS {self._round_decimal(amount)*self.exchange_rate}. Комиссия составила: {self._round_decimal(comission)}.'
                 elif target_currency == 'USD':
                     target_account.balance_usd += amount
-                    self._add_history('transfer_USD/USD', float(amount), target_account.account_number)
-                    self._add_history('comission', comission, target_account.account_number)
-                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} USD. Сумма перевода: {float(amount)}. Комиссия составила: {comission}.'
+                    self._add_history('transfer_USD/USD', self._round_decimal(amount), target_account.account_number)
+                    self._add_history('comission', self._round_decimal(comission), target_account.account_number)
+                    return f'Перевод: со счета {self.account_number} KGS в счет {target_account.account_number} USD. Сумма перевода: {self._round_decimal(amount)}. Комиссия составила: {self._round_decimal(comission)}.'
                 else: 
                     return 'Счета с такой валютой нет.'
 
             else:
-                return f'Ошибка! Недостаточно средств на счете {self.account_number}'
+                return f'Ошибка! Недостаточно средств на счете {self._round_decimal(self.balance_usd)}'
         
 
     def accrual_interest(self, percent, currency='KGS'):      # Начисление процента на счет.
+        percent = Decimal(str(percent))
         if currency == 'KGS':
             if self.balance_kgs > 0:
-                amount = self.balance_kgs * percent / 100
+                amount = self.balance_kgs * percent / Decimal('100')
                 self.balance_kgs += amount
-                self._add_history('interest_accrual', float(amount))
-                return f'На баланс {self.account_number} начислен процент {percent}% на остаток. Сумма начисления: {round(amount, 3)}'
+                self._add_history('interest_accrual', amount)
+                return f'На баланс {self.account_number} начислен процент {self._round_decimal(percent)}% на остаток. Сумма начисления: {self._round_decimal(amount)}'
             else:
                 return f'Ошибка. Баланс счета {self.account_number} KGS пуст.'
 
         elif currency == 'USD':
             if self.balance_usd > 0:
-                amount = self.balance_usd * percent / 100
+                amount = self.balance_usd * percent / Decimal('100')
                 self.balance_usd += amount
-                self._add_history('interest_accrual', float(amount))
-                return f'На баланс {self.account_number} начислен процент {percent}% на остаток. Сумма начисления: {round(amount, 3)}'
+                self._add_history('interest_accrual', amount)
+                return f'На баланс {self.account_number} начислен процент {self._round_decimal(percent)}% на остаток. Сумма начисления: {self._round_decimal(amount)}'
             else:
                 return f'Ошибка. Баланс счета {self.account_number} USD пуст.'
             
@@ -190,16 +202,7 @@ class BankAccount:   # Комиссия, взимается за перевод�
             self.is_blocked = False
             self._add_history('account_unblocked', self.is_blocked)
             return f'Счета {self.account_number} разблокированы.'
+        
 
-
-kaniet = BankAccount(123)
-islam = BankAccount(456)
-
-kaniet.balance_kgs = 100
-kaniet.balance_usd = 100
-
-islam.balance_kgs = 0
-islam.balance_usd = 0
-
-print(kaniet.deposit(10000))
-print(islam.account_status())
+    def deposite_interest(self, amount, percent, month):           # Сколько получит клиент при взносе депозита под годовой процент
+        return self._round_decimal(Decimal(str(amount)) * Decimal(str(percent)) / Decimal('100') / Decimal('12') * Decimal(str(month)))
